@@ -24,6 +24,7 @@ This project processes TikTok videos to generate comprehensive metadata includin
 - End-to-end video processing via n8n workflows
 - GPT-4 Vision analysis of video cover images
 - OpenAI Whisper audio transcription
+- **CloudConvert audio extraction** (handles videos >25MB)
 - Automated Google Drive uploads
 - GPT-4 Mini metadata generation
 - Structured JSON output
@@ -47,7 +48,9 @@ Get Video Info (sub-workflow)
     ↓
 [Visual Analysis (GPT-4) + Download Video]
     ↓
-Upload to Google Drive + Transcribe Audio (Whisper)
+Upload to Google Drive + CloudConvert Audio Extract
+    ↓
+Transcribe Audio (Whisper) ← MP3 from CloudConvert
     ↓
 Merge Results (3 inputs)
     ↓
@@ -157,6 +160,15 @@ See [notes/SAMPLE-OUTPUT.md](notes/SAMPLE-OUTPUT.md) for a complete example with
 ### Exclude
 - **Audience tags:** viral, trending, popular, fyp
 - **Generic tags:** video, tiktok, content
+
+## Large File Handling
+
+OpenAI Whisper has a 25MB file size limit. For larger videos:
+
+- CloudConvert extracts audio as MP3 (typically 1-5MB)
+- Processing adds 5-15 seconds but ensures all videos work
+- Free tier: 25 conversions/day
+- See [workflows/CLOUDCONVERT_SETUP.md](workflows/CLOUDCONVERT_SETUP.md) for implementation
 
 ## Known Limitations
 
