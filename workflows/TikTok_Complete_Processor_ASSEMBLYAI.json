@@ -193,10 +193,16 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
-        "specifyBody": "binaryData",
+        "contentType": "application/octet-stream",
+        "bodyParametersUi": {
+          "parameter": []
+        },
         "options": {
-          "batching": {
-            "batch": {}
+          "response": {
+            "response": {
+              "fullResponse": false,
+              "responseFormat": "autodetect"
+            }
           }
         }
       },
