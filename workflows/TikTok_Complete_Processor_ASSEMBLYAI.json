@@ -193,18 +193,10 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
+        "specifyBody": "raw",
+        "body": "={{ $binary.data }}",
         "contentType": "application/octet-stream",
-        "bodyParametersUi": {
-          "parameter": []
-        },
-        "options": {
-          "response": {
-            "response": {
-              "fullResponse": false,
-              "responseFormat": "autodetect"
-            }
-          }
-        }
+        "options": {}
       },
       "id": "upload-to-assemblyai",
       "name": "Upload to AssemblyAI",
