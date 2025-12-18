@@ -194,7 +194,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "raw",
-        "body": "={{ $binary.data }}",
+        "rawBody": "={{ $binary.data.toString('base64') }}",
         "contentType": "application/octet-stream",
         "options": {}
       },
@@ -333,105 +333,6 @@
         ]
       ]
     },
-    "Transcribe Audio": {
-      "main": [
-        [
-          {
-            "node": "Merge All",
-            "type": "main",
-            "index": 1
-          }
-        ]
-      ]
-    },
-    "Merge All": {
-      "main": [
-        [
-          {
-            "node": "Generate Metadata",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Generate Metadata": {
-      "main": [
-        [
-          {
-            "node": "Format Final Output",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Format Final Output": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Visual Analysis": {
-      "main": [
-        [
-          {
-            "node": "Merge All",
-            "type": "main",
-            "index": 2
-          }
-        ]
-      ]
-    },
-    "Create CloudConvert Job": {
-      "main": [
-        [
-          {
-            "node": "Upload to CloudConvert",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Upload to CloudConvert": {
-      "main": [
-        [
-          {
-            "node": "Wait for Conversion",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Wait for Conversion": {
-      "main": [
-        [
-          {
-            "node": "Download MP3",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Download MP3": {
-      "main": [
-        [
-          {
-            "node": "Transcribe Audio",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Upload to AssemblyAI": {
       "main": [
         [
@@ -472,6 +373,50 @@
             "node": "Merge All",
             "type": "main",
             "index": 1
+          }
+        ]
+      ]
+    },
+    "Visual Analysis": {
+      "main": [
+        [
+          {
+            "node": "Merge All",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge All": {
+      "main": [
+        [
+          {
+            "node": "Generate Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Metadata": {
+      "main": [
+        [
+          {
+            "node": "Format Final Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Final Output": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
