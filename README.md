@@ -27,12 +27,12 @@ This project processes TikTok videos to generate comprehensive metadata includin
 - Automated Google Drive uploads with smart filenames
   - Format: `[Title up to 80 chars] - [Capitalized Author].mp4`
   - Example: `Unlock AI Simple Tutorials for Everyday Tasks - Sabrina Ramonov.mp4`
+  - Organized in `Media/TikTok/` folder structure
 - GPT-4 Mini metadata generation
 - Structured JSON output
 
 ### 🚧 Planned
 - Shazam music identification
-- Google Drive folder organization (Media/TikTok/)
 - Batch processing interface
 - Cost monitoring dashboard
 

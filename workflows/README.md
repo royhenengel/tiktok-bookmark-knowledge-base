@@ -105,7 +105,7 @@ curl -X POST https://royhen.app.n8n.cloud/webhook/analyze-video-complete \
 
 ## Notes
 
-- Videos are currently uploaded to Google Drive root folder
+- Videos uploaded to `Media/TikTok/` folder in Google Drive
 - **Filename Format:**
   - Title limited to 80 characters (preserves original casing and spaces)
   - Author capitalized from underscore format (e.g., `sabrina_ramonov` → `Sabrina Ramonov`)
