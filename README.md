@@ -15,8 +15,8 @@ This project processes TikTok videos to generate comprehensive metadata includin
 - **Visual Analysis** (via GPT-4 Vision)
 - **Google Drive Storage** (organized video library)
 
-**Processing Time:** ~20-25 seconds per video
-**Cost:** ~$0.012 per video (target: <$0.06)
+**Processing Time:** ~25-30 seconds per video
+**Cost:** ~$0.017 per video (target: <$0.06)
 
 ## Features
 
@@ -49,7 +49,7 @@ Get Video Info (sub-workflow)
     ↓
 Upload to Google Drive + Upload to AssemblyAI
     ↓
-Submit Transcription → Wait 10s → Get Transcription
+Submit Transcription → Wait 3s → Check Status → Loop Until Complete
     ↓
 Merge Results (3 inputs)
     ↓
@@ -89,7 +89,8 @@ Format & Return JSON
 ### Prerequisites
 
 - n8n Cloud account (https://n8n.io)
-- OpenAI API key (GPT-4, Whisper, GPT-4 Mini access)
+- OpenAI API key (GPT-4, GPT-4 Mini access)
+- AssemblyAI API key (audio transcription)
 - Google Drive OAuth2 credentials
 - RapidAPI key (for TikTok endpoint)
 
@@ -99,6 +100,7 @@ Format & Return JSON
    - Import workflows from `workflows/` folder
    - Configure credentials in n8n:
      - OpenAI API
+     - AssemblyAI API
      - Google Drive OAuth2
      - RapidAPI Header Auth
 
@@ -109,8 +111,7 @@ Format & Return JSON
    ```
 
 3. **Activate Workflows**
-   - Main: TikTok Video Complete Processor
-   - Sub: TikTok Video Info - No Code Node
+   - Main: TikTok Video Complete Processor with AssemblyAI
 
 ## Usage
 
@@ -135,17 +136,17 @@ See [notes/SAMPLE-OUTPUT.md](notes/SAMPLE-OUTPUT.md) for a complete example with
 ## Cost Breakdown
 
 **Target:** <$0.06 per video
-**Actual:** ~$0.012 per video
+**Actual:** ~$0.017 per video
 
 | Component | Cost per Video |
 |-----------|---------------|
 | GPT-4 Vision (cover analysis) | ~$0.01 |
-| **AssemblyAI (transcription)** | **~$0.001** |
+| **AssemblyAI (transcription)** | **~$0.005** |
 | GPT-4 Mini (metadata) | ~$0.001 |
 | RapidAPI (TikTok data) | Included |
 | Google Drive storage | Included |
 
-**Budget:** $50 for testing (~830 videos at target rate, ~4,160 at actual rate)
+**Budget:** $50 for testing (~830 videos at target rate, ~2,940 at actual rate)
 
 ## Tag Guidelines
 
@@ -188,10 +189,11 @@ MIT License - See [LICENSE](LICENSE) for details
 ## Acknowledgments
 
 - Built with [n8n](https://n8n.io)
-- Powered by [OpenAI](https://openai.com) (GPT-4, Whisper)
+- Powered by [OpenAI](https://openai.com) (GPT-4 Vision, GPT-4 Mini)
+- Transcription by [AssemblyAI](https://www.assemblyai.com)
 - Video data via [RapidAPI TikTok endpoint](https://rapidapi.com)
 
 ---
 
-**Last Updated:** December 17, 2025
-**Status:** ✅ Working end-to-end
+**Last Updated:** December 21, 2025
+**Status:** ✅ Working end-to-end with AssemblyAI
