@@ -89,10 +89,6 @@ Target: ~$0.017 per video
 - GPT-4 Mini (metadata generation): ~$0.001
 - Google Drive storage: Included in plan
 
-## Setup Instructions
-
-See [ASSEMBLYAI_SETUP.md](ASSEMBLYAI_SETUP.md) for detailed setup instructions.
-
 ## Testing
 
 Test the workflow:
