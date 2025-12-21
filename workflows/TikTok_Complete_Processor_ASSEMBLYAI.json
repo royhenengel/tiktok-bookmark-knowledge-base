@@ -12,10 +12,7 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        240,
-        208
-      ],
+      "position": [240, 208],
       "webhookId": "analyze-video-complete"
     },
     {
@@ -31,10 +28,7 @@
       "name": "Get Video Info",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        464,
-        208
-      ]
+      "position": [464, 208]
     },
     {
       "parameters": {
@@ -51,10 +45,7 @@
       "name": "Download Video",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        688,
-        304
-      ]
+      "position": [688, 304]
     },
     {
       "parameters": {
@@ -75,10 +66,7 @@
       "name": "Upload to Google Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "position": [
-        912,
-        400
-      ],
+      "position": [912, 400],
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "ofFKlLc4IoxLD68F",
@@ -97,10 +85,7 @@
       "name": "Merge All",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [
-        1184,
-        192
-      ]
+      "position": [1704, 192]
     },
     {
       "parameters": {
@@ -109,22 +94,15 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "openAiApi",
         "sendBody": true,
-        "specifyBody": "=={{ {\n  \"model\": \"gpt-4o-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a metadata generator for TikTok videos. Generate:\\n1. Title: 50-100 characters, descriptive, specific, keyword-rich, covering BOTH visual and spoken content\\n2. Description: 2-3 sentences covering visual AND transcribed audio content\\n3. Tags: 5+ tags covering topic, style, mood, format, purpose. NO audience tags like 'viral', 'trending', 'popular'. Focus on content descriptors.\\n\\nReturn ONLY valid JSON with fields: title, description, tags (array)\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Visual Analysis: \" + $json.choices[0].message.content + \"\\n\\nTranscription: \" + ($json.text || \"No spoken words detected\") + \"\\n\\nGenerate metadata for this video.\"\n    }\n  ],\n  \"response_format\": { \"type\": \"json_object\" },\n  \"max_tokens\": 400\n} }}\n",
-        "bodyParameters": {
-          "parameters": [
-            {}
-          ]
-        },
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"model\": \"gpt-4o-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a metadata generator for TikTok videos. Generate:\\n1. Title: 50-100 characters, descriptive, specific, keyword-rich, covering BOTH visual and spoken content\\n2. Description: 2-3 sentences covering visual AND transcribed audio content\\n3. Tags: 5+ tags covering topic, style, mood, format, purpose. NO audience tags like 'viral', 'trending', 'popular'. Focus on content descriptors.\\n\\nReturn ONLY valid JSON with fields: title, description, tags (array)\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Visual Analysis: \" + $json.choices[0].message.content + \"\\n\\nTranscription: \" + ($json.text || \"No spoken words detected\") + \"\\n\\nGenerate metadata for this video.\"\n    }\n  ],\n  \"response_format\": { \"type\": \"json_object\" },\n  \"max_tokens\": 400\n} }}",
         "options": {}
       },
       "id": "generate-metadata",
       "name": "Generate Metadata",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1360,
-        208
-      ],
+      "position": [1880, 208],
       "credentials": {
         "openAiApi": {
           "id": "p4lXz4PI3LIye0EB",
@@ -134,16 +112,13 @@
     },
     {
       "parameters": {
-        "jsCode": "const videoInfo = $('Get Video Info').item.json;\nconst visualAnalysis = $('Visual Analysis').item.json.choices[0].message.content;\nconst transcription = $('Get Transcription').item.json.text;\nconst metadata = JSON.parse($('Generate Metadata').item.json.choices[0].message.content);\nconst googleDrive = $('Upload to Google Drive').item.json;\n\nreturn {\n  json: {\n    title: metadata.title,\n    description: metadata.description,\n    tags: metadata.tags,\n    transcription: transcription,\n    video_url: videoInfo.video_url,\n    video_id: videoInfo.video_id,\n    author: videoInfo.author,\n    duration: videoInfo.duration,\n    music: { title: videoInfo.music_title, artist: videoInfo.music_author },\n    visual_analysis: visualAnalysis,\n    google_drive: {\n      file_id: googleDrive.id,\n      file_name: googleDrive.name,\n      file_url: googleDrive.webViewLink || 'N/A'\n    },\n    processed_at: new Date().toISOString()\n  }\n};"
+        "jsCode": "const videoInfo = $('Get Video Info').item.json;\nconst visualAnalysis = $('Visual Analysis').item.json.choices[0].message.content;\nconst transcription = $('Check Status').item.json.text;\nconst metadata = JSON.parse($('Generate Metadata').item.json.choices[0].message.content);\nconst googleDrive = $('Upload to Google Drive').item.json;\n\nreturn {\n  json: {\n    title: metadata.title,\n    description: metadata.description,\n    tags: metadata.tags,\n    transcription: transcription,\n    video_url: videoInfo.video_url,\n    video_id: videoInfo.video_id,\n    author: videoInfo.author,\n    duration: videoInfo.duration,\n    music: { title: videoInfo.music_title, artist: videoInfo.music_author },\n    visual_analysis: visualAnalysis,\n    google_drive: {\n      file_id: googleDrive.id,\n      file_name: googleDrive.name,\n      file_url: googleDrive.webViewLink || 'N/A'\n    },\n    processed_at: new Date().toISOString()\n  }\n};"
       },
       "id": "format-output",
       "name": "Format Final Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1584,
-        208
-      ]
+      "position": [2104, 208]
     },
     {
       "parameters": {
@@ -155,10 +130,7 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [
-        1808,
-        208
-      ]
+      "position": [2328, 208]
     },
     {
       "parameters": {
@@ -175,10 +147,7 @@
       "name": "Visual Analysis",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        912,
-        16
-      ],
+      "position": [912, 16],
       "credentials": {
         "openAiApi": {
           "id": "p4lXz4PI3LIye0EB",
@@ -193,19 +162,18 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
-        "specifyBody": "raw",
-        "rawBody": "={{ $binary.data.toString('base64') }}",
-        "contentType": "application/octet-stream",
-        "options": {}
+        "specifyBody": "binaryData",
+        "inputDataFieldName": "data",
+        "bodyContentType": "raw",
+        "options": {
+          "timeout": 120000
+        }
       },
       "id": "upload-to-assemblyai",
       "name": "Upload to AssemblyAI",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        800,
-        208
-      ],
+      "position": [912, 208],
       "credentials": {
         "httpHeaderAuth": {
           "id": "assemblyai",
@@ -228,10 +196,7 @@
       "name": "Submit Transcription",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1000,
-        208
-      ],
+      "position": [1088, 208],
       "credentials": {
         "httpHeaderAuth": {
           "id": "assemblyai",
@@ -242,16 +207,13 @@
     {
       "parameters": {
         "unit": "seconds",
-        "amount": 10
+        "amount": 3
       },
-      "id": "wait-assemblyai",
-      "name": "Wait for AssemblyAI",
+      "id": "wait-3s",
+      "name": "Wait 3 Seconds",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [
-        1200,
-        208
-      ],
+      "position": [1264, 208],
       "webhookSuffix": ""
     },
     {
@@ -262,164 +224,100 @@
         "genericAuthType": "httpHeaderAuth",
         "options": {}
       },
-      "id": "get-transcription",
-      "name": "Get Transcription",
+      "id": "check-status",
+      "name": "Check Status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1400,
-        208
-      ],
+      "position": [1440, 208],
       "credentials": {
         "httpHeaderAuth": {
           "id": "assemblyai",
           "name": "AssemblyAI API"
         }
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "status-completed",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-completed",
+      "name": "If Completed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1616, 208]
     }
   ],
   "connections": {
     "Webhook": {
-      "main": [
-        [
-          {
-            "node": "Get Video Info",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{"node": "Get Video Info", "type": "main", "index": 0}]]
     },
     "Get Video Info": {
       "main": [
         [
-          {
-            "node": "Download Video",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Visual Analysis",
-            "type": "main",
-            "index": 0
-          }
+          {"node": "Download Video", "type": "main", "index": 0},
+          {"node": "Visual Analysis", "type": "main", "index": 0}
         ]
       ]
     },
     "Download Video": {
       "main": [
         [
-          {
-            "node": "Upload to Google Drive",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Upload to AssemblyAI",
-            "type": "main",
-            "index": 0
-          }
+          {"node": "Upload to Google Drive", "type": "main", "index": 0},
+          {"node": "Upload to AssemblyAI", "type": "main", "index": 0}
         ]
       ]
     },
     "Upload to Google Drive": {
-      "main": [
-        [
-          {
-            "node": "Merge All",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{"node": "Merge All", "type": "main", "index": 0}]]
     },
     "Upload to AssemblyAI": {
-      "main": [
-        [
-          {
-            "node": "Submit Transcription",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{"node": "Submit Transcription", "type": "main", "index": 0}]]
     },
     "Submit Transcription": {
-      "main": [
-        [
-          {
-            "node": "Wait for AssemblyAI",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{"node": "Wait 3 Seconds", "type": "main", "index": 0}]]
     },
-    "Wait for AssemblyAI": {
-      "main": [
-        [
-          {
-            "node": "Get Transcription",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Wait 3 Seconds": {
+      "main": [[{"node": "Check Status", "type": "main", "index": 0}]]
     },
-    "Get Transcription": {
+    "Check Status": {
+      "main": [[{"node": "If Completed", "type": "main", "index": 0}]]
+    },
+    "If Completed": {
       "main": [
-        [
-          {
-            "node": "Merge All",
-            "type": "main",
-            "index": 1
-          }
-        ]
+        [{"node": "Merge All", "type": "main", "index": 1}],
+        [{"node": "Wait 3 Seconds", "type": "main", "index": 0}]
       ]
     },
     "Visual Analysis": {
-      "main": [
-        [
-          {
-            "node": "Merge All",
-            "type": "main",
-            "index": 2
-          }
-        ]
-      ]
+      "main": [[{"node": "Merge All", "type": "main", "index": 2}]]
     },
     "Merge All": {
-      "main": [
-        [
-          {
-            "node": "Generate Metadata",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{"node": "Generate Metadata", "type": "main", "index": 0}]]
     },
     "Generate Metadata": {
-      "main": [
-        [
-          {
-            "node": "Format Final Output",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{"node": "Format Final Output", "type": "main", "index": 0}]]
     },
     "Format Final Output": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
     }
   },
   "settings": {
