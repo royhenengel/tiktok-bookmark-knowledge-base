@@ -80,7 +80,7 @@ Cloud Function Download ──────────────────�
 
 ### Working
 - End-to-end video processing via n8n + Cloud Function
-- **Cloud Function** handles video download and storage (no file size limits)
+- **Cloud Function** handles video download via yt-dlp (free, unlimited) with RapidAPI fallback
 - GPT-4 Vision analysis of video cover images
 - **AssemblyAI audio transcription** (96% accuracy, URL-based - no upload needed)
 - **ACRCloud music recognition** with:
@@ -164,7 +164,7 @@ Cloud Function Download ──────────────────�
 - AssemblyAI API key (audio transcription)
 - ACRCloud account (music recognition)
 - Google Drive OAuth2 credentials
-- RapidAPI key (for TikTok endpoint)
+- RapidAPI key (optional fallback for TikTok downloads)
 
 ### Configuration
 
@@ -220,7 +220,8 @@ See [notes/SAMPLE-OUTPUT.md](notes/SAMPLE-OUTPUT.md) for a complete example with
 | ACRCloud (music recognition) | ~$0.001 |
 | GPT-4 Mini (metadata) | ~$0.001 |
 | Cloud Function | ~$0.0004 |
-| RapidAPI (TikTok data) | Included |
+| yt-dlp (TikTok download) | Free |
+| RapidAPI (fallback only) | Free tier |
 | Google Cloud Storage | Minimal |
 | Google Drive storage | Included |
 
@@ -279,7 +280,7 @@ See [notes/SAMPLE-OUTPUT.md](notes/SAMPLE-OUTPUT.md) for a complete example with
 2. **Transcription:** May be empty for music-only videos (expected)
 3. **Music Recognition:** May not identify indie/original tracks not in ACRCloud's database
 4. **Play Offset:** Shows position in matched song, not TikTok video timestamp
-5. **RapidAPI Rate Limits:** TikTok API may rate limit Cloud Function IPs temporarily
+5. **TikTok Rate Limits:** TikTok may temporarily block Cloud Function IPs (yt-dlp falls back to RapidAPI)
 
 ## Tag Guidelines
 
@@ -308,7 +309,7 @@ MIT License - See [LICENSE](LICENSE) for details
 - Powered by [OpenAI](https://openai.com) (GPT-4 Vision, GPT-4 Mini)
 - Transcription by [AssemblyAI](https://www.assemblyai.com)
 - Music recognition by [ACRCloud](https://www.acrcloud.com)
-- Video data via [RapidAPI TikTok endpoint](https://rapidapi.com)
+- Video downloads via [yt-dlp](https://github.com/yt-dlp/yt-dlp) (primary) with [RapidAPI](https://rapidapi.com) fallback
 - Cloud infrastructure by [Google Cloud](https://cloud.google.com)
 
 ---

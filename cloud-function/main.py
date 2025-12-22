@@ -41,7 +41,86 @@ def download_video(url, tmpdir):
 
 
 def download_tiktok_video(url, tmpdir):
-    """Download TikTok video using RapidAPI to bypass IP blocks."""
+    """Download TikTok video using yt-dlp (primary) with RapidAPI fallback."""
+
+    # Try yt-dlp first (free, no API limits)
+    try:
+        print(f"Attempting TikTok download with yt-dlp: {url}")
+        print(f"tmpdir type: {type(tmpdir)}, value: {tmpdir}")
+        result = download_tiktok_with_ytdlp(url, tmpdir)
+        print("yt-dlp download successful")
+        return result
+    except Exception as ytdlp_error:
+        import traceback
+        print(f"yt-dlp failed: {ytdlp_error}")
+        print(f"Full traceback: {traceback.format_exc()}")
+        print("Falling back to RapidAPI")
+
+    # Fallback to RapidAPI
+    return download_tiktok_with_rapidapi(url, tmpdir)
+
+
+def download_tiktok_with_ytdlp(url, tmpdir):
+    """Download TikTok video using yt-dlp."""
+    import io
+
+    # Ensure tmpdir is a string (not bytes)
+    if isinstance(tmpdir, bytes):
+        tmpdir = tmpdir.decode('utf-8')
+
+    output_template = os.path.join(str(tmpdir), '%(id)s.%(ext)s')
+
+    # Create a null logger to avoid stdout/stderr issues in Cloud Functions
+    class NullLogger:
+        def debug(self, msg): pass
+        def info(self, msg): pass
+        def warning(self, msg): pass
+        def error(self, msg): print(f"yt-dlp error: {msg}")
+
+    ydl_opts = {
+        'format': 'best[ext=mp4]/best',
+        'outtmpl': output_template,
+        'quiet': True,
+        'no_warnings': True,
+        'noprogress': True,
+        'extract_flat': False,
+        'socket_timeout': 30,
+        'logger': NullLogger(),
+    }
+
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url, download=True)
+        video_id = str(info.get('id', 'unknown'))
+        ext = str(info.get('ext', 'mp4'))
+
+        # Use yt-dlp's prepared filename to get actual path
+        filepath = ydl.prepare_filename(info)
+
+        # Fallback if prepare_filename doesn't work
+        if not os.path.exists(filepath):
+            filepath = os.path.join(str(tmpdir), f"{video_id}.{ext}")
+
+        # Get title - TikTok often puts it in description
+        title = info.get('title') or ''
+        if not title or title == video_id:
+            title = info.get('description', 'Untitled')
+        title = str(title)[:100] if title else 'Untitled'
+
+        return {
+            'filepath': filepath,
+            'title': title,
+            'duration': info.get('duration', 0),
+            'ext': ext,
+            'uploader': str(info.get('uploader') or info.get('creator') or info.get('uploader_id') or 'Unknown'),
+            'video_id': video_id,
+            'source': 'tiktok',
+            'thumbnail': info.get('thumbnail'),
+            'download_method': 'yt-dlp',
+        }
+
+
+def download_tiktok_with_rapidapi(url, tmpdir):
+    """Download TikTok video using RapidAPI (fallback method)."""
     import requests
 
     RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY', '884a3146bfmsh62db44df12afa3ap1128d5jsn232683fd49f1')
@@ -75,6 +154,7 @@ def download_tiktok_video(url, tmpdir):
         for chunk in video_response.iter_content(chunk_size=8192):
             f.write(chunk)
 
+    print("RapidAPI download successful")
     return {
         'filepath': filepath,
         'title': video_data.get('title', 'Untitled'),
@@ -84,6 +164,7 @@ def download_tiktok_video(url, tmpdir):
         'video_id': video_id,
         'source': 'tiktok',
         'thumbnail': video_data.get('cover'),
+        'download_method': 'rapidapi',
     }
 
 
