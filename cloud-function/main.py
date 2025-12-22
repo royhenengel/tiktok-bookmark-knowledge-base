@@ -1,17 +1,20 @@
 import functions_framework
 from google.oauth2 import service_account
 from google.cloud import storage
+import google.generativeai as genai
 import yt_dlp
 import tempfile
 import subprocess
 import os
 import json
 import traceback
+import time
 from datetime import timedelta
 
 # Configuration
 BUCKET_NAME = os.environ.get('GCS_BUCKET', 'video-processor-temp-rhe')
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyBfLzyYXcOxHYJjcx21NOuOqfl0FMDLSwE')
 
 
 def get_storage_client():
@@ -264,6 +267,92 @@ def generate_smart_filename(title, uploader, ext='mp4'):
     return f"{sanitized_title} - {capitalized_uploader}.{ext}"
 
 
+def analyze_video_with_gemini(video_path, api_key=None):
+    """Analyze video content using Gemini 1.5 Pro.
+
+    Uses the File API for reliable video upload and processing.
+    Returns detailed analysis of video content.
+    """
+    api_key = api_key or GEMINI_API_KEY
+    if not api_key:
+        return {'error': 'No Gemini API key provided', 'analysis': None}
+
+    try:
+        print(f"Starting Gemini video analysis for: {video_path}")
+
+        # Configure the Gemini API
+        genai.configure(api_key=api_key)
+
+        # Upload video to Gemini File API
+        print("Uploading video to Gemini File API...")
+        video_file = genai.upload_file(path=video_path)
+        print(f"Upload complete. File name: {video_file.name}")
+
+        # Wait for file to be processed
+        print("Waiting for video processing...")
+        max_wait = 120  # Maximum wait time in seconds
+        wait_time = 0
+        while video_file.state.name == "PROCESSING" and wait_time < max_wait:
+            time.sleep(5)
+            wait_time += 5
+            video_file = genai.get_file(video_file.name)
+            print(f"Processing... ({wait_time}s)")
+
+        if video_file.state.name == "FAILED":
+            return {'error': f'Gemini file processing failed: {video_file.state.name}', 'analysis': None}
+
+        if video_file.state.name != "ACTIVE":
+            return {'error': f'Gemini file not ready after {max_wait}s: {video_file.state.name}', 'analysis': None}
+
+        print(f"Video ready. State: {video_file.state.name}")
+
+        # Create the model and generate analysis
+        model = genai.GenerativeModel('gemini-2.0-flash')
+
+        prompt = """Analyze this video in detail. Provide a comprehensive analysis covering:
+
+1. **Visual Content**: Describe what you see throughout the video - people, objects, settings, actions, transitions, visual effects, text overlays, and any on-screen graphics.
+
+2. **Audio Content**: Describe the audio - speech (summarize what is said), music, sound effects, and overall audio quality.
+
+3. **Style & Production**: Comment on the video style, editing techniques, pacing, and production quality.
+
+4. **Mood & Tone**: Describe the overall mood, emotional tone, and atmosphere of the video.
+
+5. **Key Messages**: What are the main points, messages, or takeaways from this video?
+
+6. **Content Category**: What type of content is this? (e.g., tutorial, entertainment, educational, promotional, personal vlog, etc.)
+
+Be specific and detailed in your analysis."""
+
+        print("Generating video analysis...")
+        response = model.generate_content([video_file, prompt])
+
+        # Clean up - delete the uploaded file
+        try:
+            genai.delete_file(video_file.name)
+            print("Cleaned up uploaded file")
+        except Exception as cleanup_error:
+            print(f"Warning: Failed to delete uploaded file: {cleanup_error}")
+
+        analysis_text = response.text
+        print(f"Analysis complete. Length: {len(analysis_text)} chars")
+
+        return {
+            'analysis': analysis_text,
+            'model': 'gemini-2.0-flash',
+            'error': None
+        }
+
+    except Exception as e:
+        error_msg = str(e)
+        print(f"Gemini analysis error: {error_msg}")
+        return {
+            'error': error_msg,
+            'analysis': None
+        }
+
+
 @functions_framework.http
 def download_and_store(request):
     """Main Cloud Function entry point."""
@@ -291,6 +380,8 @@ def download_and_store(request):
         video_url = request_json.get('video_url')
         custom_filename = request_json.get('filename')
         extract_audio_flag = request_json.get('extract_audio', True)
+        analyze_video_flag = request_json.get('analyze_video', True)
+        gemini_api_key = request_json.get('gemini_api_key')
 
         if not video_url:
             return ({'error': 'video_url is required'}, 400, headers)
@@ -348,6 +439,14 @@ def download_and_store(request):
                         'size_bytes': audio_file['size_bytes'],
                         'blob_name': audio_file['blob_name'],
                     }
+
+            # Analyze video with Gemini if requested
+            if analyze_video_flag:
+                gemini_result = analyze_video_with_gemini(
+                    video_info['filepath'],
+                    api_key=gemini_api_key
+                )
+                response['gemini_analysis'] = gemini_result
 
             return (response, 200, headers)
 
