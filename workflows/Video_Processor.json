@@ -1,5 +1,5 @@
 {
-  "name": "TikTok Video Complete Processor",
+  "name": "Video Processor",
   "nodes": [
     {
       "parameters": {
@@ -12,7 +12,10 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-640, -736],
+      "position": [
+        -640,
+        -736
+      ],
       "webhookId": "analyze-video-complete"
     },
     {
@@ -30,7 +33,10 @@
       "name": "Cloud Function Download",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-448, -736]
+      "position": [
+        -448,
+        -736
+      ]
     },
     {
       "parameters": {
@@ -47,7 +53,10 @@
       "name": "Submit Transcription",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-96, -944],
+      "position": [
+        -96,
+        -944
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "eJYyx8goZbb1aVw9",
@@ -63,7 +72,10 @@
       "name": "Wait 3 Seconds",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [96, -944],
+      "position": [
+        96,
+        -944
+      ],
       "webhookId": "66e94262-ce65-4a7f-b10c-bfe01c328f5c"
     },
     {
@@ -77,7 +89,10 @@
       "name": "Check Status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [272, -944],
+      "position": [
+        272,
+        -944
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "eJYyx8goZbb1aVw9",
@@ -113,7 +128,10 @@
       "name": "If Completed",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [448, -944]
+      "position": [
+        448,
+        -944
+      ]
     },
     {
       "parameters": {
@@ -130,7 +148,10 @@
       "name": "Visual Analysis",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-256, -560],
+      "position": [
+        -256,
+        -560
+      ],
       "credentials": {
         "openAiApi": {
           "id": "p4lXz4PI3LIye0EB",
@@ -148,7 +169,10 @@
       "name": "Merge Transcription & Visual",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [720, -576]
+      "position": [
+        720,
+        -576
+      ]
     },
     {
       "parameters": {
@@ -165,7 +189,10 @@
       "name": "Generate Metadata",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [928, -576],
+      "position": [
+        928,
+        -576
+      ],
       "credentials": {
         "openAiApi": {
           "id": "p4lXz4PI3LIye0EB",
@@ -189,7 +216,10 @@
       "name": "Download Audio from Storage",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-256, -736]
+      "position": [
+        -256,
+        -736
+      ]
     },
     {
       "parameters": {
@@ -199,7 +229,10 @@
       "name": "ACRCloud Prepare Signature",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-64, -736]
+      "position": [
+        -64,
+        -736
+      ]
     },
     {
       "parameters": {
@@ -248,7 +281,10 @@
       "name": "ACRCloud Music Recognition",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [128, -736]
+      "position": [
+        128,
+        -736
+      ]
     },
     {
       "parameters": {
@@ -266,7 +302,10 @@
       "name": "Download Video from Storage",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1136, -720]
+      "position": [
+        1136,
+        -720
+      ]
     },
     {
       "parameters": {
@@ -278,7 +317,10 @@
       "name": "Merge Metadata with Video",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [1328, -720]
+      "position": [
+        1328,
+        -720
+      ]
     },
     {
       "parameters": {
@@ -301,7 +343,10 @@
       "name": "Upload to Google Drive",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
-      "position": [1520, -720],
+      "position": [
+        1520,
+        -720
+      ],
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "ofFKlLc4IoxLD68F",
@@ -319,7 +364,10 @@
       "name": "Merge ACRCloud with Output",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [1920, -720]
+      "position": [
+        1920,
+        -720
+      ]
     },
     {
       "parameters": {
@@ -329,7 +377,10 @@
       "name": "Format Final Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2112, -720]
+      "position": [
+        2112,
+        -720
+      ]
     },
     {
       "parameters": {
@@ -341,7 +392,10 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [2300, -720]
+      "position": [
+        2300,
+        -720
+      ]
     }
   ],
   "connections": {

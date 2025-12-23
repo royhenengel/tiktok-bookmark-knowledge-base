@@ -1,0 +1,325 @@
+{
+  "name": "Bookmark Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "event": "pageAddedToDatabase",
+        "databaseId": {
+          "__rl": true,
+          "value": "2cf4df89-4a69-819f-941c-f3f8703ef620",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "notion-trigger",
+      "name": "New Bookmark in Notion",
+      "type": "n8n-nodes-base.notionTrigger",
+      "typeVersion": 1,
+      "position": [-200, -200],
+      "credentials": {
+        "notionApi": {
+          "id": "vGGxyUaNL70rqYcQ",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract URL and page ID from Notion trigger\nconst page = $input.first().json;\n\n// Get URL from Link property\nconst url = page.properties?.Link?.url || page.properties?.URL?.url;\nconst notionPageId = page.id;\n\nif (!url) {\n  throw new Error(\"No URL found in Notion page Link property\");\n}\n\n// Video URL patterns\nconst videoPatterns = [\"tiktok.com\", \"youtube.com\", \"youtu.be\", \"vimeo.com\", \"twitch.tv\"];\nconst isVideo = videoPatterns.some(pattern => url.toLowerCase().includes(pattern));\n\n// Extract domain\nconst domainMatch = url.match(/^https?:\\/\\/(?:www\\.)?([^\\/:]+)/);\nconst domain = domainMatch ? domainMatch[1] : 'unknown';\n\nreturn {\n  url,\n  notionPageId,\n  domain,\n  isVideo,\n  processorUrl: isVideo \n    ? \"https://us-central1-video-processor-rhe.cloudfunctions.net/video-downloader\"\n    : \"https://us-central1-video-processor-rhe.cloudfunctions.net/webpage-enricher\",\n  source: 'notion-trigger'\n};"
+      },
+      "id": "extract-from-notion",
+      "name": "Extract from Notion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, -200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "process-bookmark",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-200, 100],
+      "webhookId": "process-bookmark"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract URL and determine type from webhook\nconst url = $input.first().json.url || $input.first().json.body?.url;\nconst notionPageId = $input.first().json.notion_page_id || $input.first().json.body?.notion_page_id;\n\nif (!url) {\n  throw new Error(\"No URL provided\");\n}\n\n// Video URL patterns\nconst videoPatterns = [\"tiktok.com\", \"youtube.com\", \"youtu.be\", \"vimeo.com\", \"twitch.tv\"];\nconst isVideo = videoPatterns.some(pattern => url.toLowerCase().includes(pattern));\n\n// Extract domain using regex (URL constructor not available in n8n sandbox)\nconst domainMatch = url.match(/^https?:\\/\\/(?:www\\.)?([^\\/:]+)/);\nconst domain = domainMatch ? domainMatch[1] : 'unknown';\n\nreturn {\n  url,\n  notionPageId,\n  domain,\n  isVideo,\n  processorUrl: isVideo \n    ? \"https://us-central1-video-processor-rhe.cloudfunctions.net/video-downloader\"\n    : \"https://us-central1-video-processor-rhe.cloudfunctions.net/webpage-enricher\",\n  source: 'webhook'\n};"
+      },
+      "id": "detect-type",
+      "name": "Detect URL Type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.processorUrl }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.isVideo ? JSON.stringify({ video_url: $json.url }) : JSON.stringify({ url: $json.url }) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "call-processor",
+      "name": "Call Processor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get result from processor - handle wrapped data field\nlet rawResult = $input.first().json;\nlet result = rawResult;\n\n// If data is wrapped in a 'data' field as string, parse it\nif (rawResult.data && typeof rawResult.data === 'string') {\n  result = JSON.parse(rawResult.data);\n}\n\nconst detectData = $('Detect URL Type').item.json;\n\n// Build normalized output\nconst output = {\n  notionPageId: detectData.notionPageId,\n  url: result.url || detectData.url,\n  domain: result.domain || detectData.domain,\n  title: result.title,\n  type: detectData.isVideo ? \"video\" : (result.type || \"article\"),\n  ai_summary: result.ai_summary || result.description,\n  ai_analysis: result.ai_analysis || result.gemini_analysis?.analysis,\n  author: result.author,\n  processed_at: result.processed_at || new Date().toISOString()\n};\n\n// Video-specific fields\nif (detectData.isVideo && result.gemini_analysis) {\n  output.transcript = result.transcription;\n  output.visual_analysis = result.gemini_analysis?.analysis;\n  output.music = result.music;\n  output.google_drive = result.google_drive;\n  output.duration = result.duration;\n}\n\n// Webpage-specific fields\nif (result.reading_time) {\n  output.reading_time = result.reading_time;\n}\nif (result.price !== undefined && result.price !== null) {\n  output.price = result.price;\n  output.currency = result.currency;\n}\nif (result.code_snippets?.length) {\n  output.code_snippets = result.code_snippets;\n}\nif (result.error) {\n  output.error = result.error;\n}\n\nreturn output;"
+      },
+      "id": "normalize-results",
+      "name": "Normalize Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-notion-id",
+              "leftValue": "={{ $json.notionPageId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-notion-id",
+      "name": "Has Notion Page?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Notion API update payload\nconst data = $input.first().json;\n\n// Map type to Notion select options\nconst typeMap = {\n  'video': 'Video',\n  'article': 'Article',\n  'product': 'Product',\n  'tool': 'Tool',\n  'code': 'Code',\n  'social': 'Social',\n  'other': 'Other'\n};\n\nconst properties = {};\n\n// Title\nif (data.title) {\n  properties['Title'] = {\n    title: [{ text: { content: data.title.substring(0, 2000) } }]\n  };\n}\n\n// Type (select)\nif (data.type) {\n  properties['Type'] = {\n    select: { name: typeMap[data.type] || 'Other' }\n  };\n}\n\n// AI Summary (rich_text)\nif (data.ai_summary) {\n  properties['AI Summary'] = {\n    rich_text: [{ text: { content: data.ai_summary.substring(0, 2000) } }]\n  };\n}\n\n// Domain (rich_text)\nif (data.domain) {\n  properties['Domain'] = {\n    rich_text: [{ text: { content: data.domain } }]\n  };\n}\n\n// Author (rich_text)\nif (data.author) {\n  properties['Author'] = {\n    rich_text: [{ text: { content: data.author.substring(0, 200) } }]\n  };\n}\n\n// Reading Time (number)\nif (data.reading_time) {\n  properties['Reading Time'] = {\n    number: data.reading_time\n  };\n}\n\n// Price (number)\nif (data.price !== undefined && data.price !== null) {\n  properties['Price'] = {\n    number: data.price\n  };\n}\n\n// Status -> To review (since we just processed it)\nproperties['Status'] = {\n  status: { name: 'To review' }\n};\n\nreturn {\n  pageId: data.notionPageId,\n  properties,\n  originalData: data\n};"
+      },
+      "id": "build-notion-payload",
+      "name": "Build Notion Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, -100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $json.pageId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Notion-Version\": \"2022-06-28\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ properties: $json.properties }) }}",
+        "options": {}
+      },
+      "id": "update-notion-page",
+      "name": "Update Notion Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, -100],
+      "credentials": {
+        "notionApi": {
+          "id": "zOh22ge1kZkwi6P5",
+          "name": "NotionAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return original enriched data for response\nconst payload = $('Build Notion Payload').item.json;\nconst notionResult = $input.first().json;\n\nreturn {\n  ...payload.originalData,\n  notion_updated: true,\n  notion_page_url: notionResult.url || null\n};"
+      },
+      "id": "merge-notion-result",
+      "name": "Add Notion Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// No Notion page to update, just pass through\nconst data = $input.first().json;\nreturn {\n  ...data,\n  notion_updated: false\n};"
+      },
+      "id": "no-notion-update",
+      "name": "Skip Notion Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1760, 0]
+    }
+  ],
+  "connections": {
+    "New Bookmark in Notion": {
+      "main": [
+        [
+          {
+            "node": "Extract from Notion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from Notion": {
+      "main": [
+        [
+          {
+            "node": "Call Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Detect URL Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect URL Type": {
+      "main": [
+        [
+          {
+            "node": "Call Processor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Processor": {
+      "main": [
+        [
+          {
+            "node": "Normalize Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Results": {
+      "main": [
+        [
+          {
+            "node": "Has Notion Page?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Notion Page?": {
+      "main": [
+        [
+          {
+            "node": "Build Notion Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Notion Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Notion Payload": {
+      "main": [
+        [
+          {
+            "node": "Update Notion Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Notion Page": {
+      "main": [
+        [
+          {
+            "node": "Add Notion Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Notion Status": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Notion Update": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
