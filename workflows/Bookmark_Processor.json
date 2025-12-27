@@ -38,6 +38,7 @@
       },
       "id": "call-processor",
       "name": "Call Processor",
+      "onError": "continueErrorOutput",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [440, 0]
@@ -83,7 +84,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Build Notion API update payload\nconst data = $input.first().json;\n\n// Map type to Notion select options\nconst typeMap = {\n  'video': 'Video',\n  'article': 'Article',\n  'product': 'Product',\n  'tool': 'Tool',\n  'code': 'Code',\n  'social': 'Social',\n  'other': 'Other'\n};\n\nconst properties = {};\n\n// Title\nif (data.title) {\n  properties['Title'] = {\n    title: [{ text: { content: data.title.substring(0, 2000) } }]\n  };\n}\n\n// Type (select)\nif (data.type) {\n  properties['Type'] = {\n    select: { name: typeMap[data.type] || 'Other' }\n  };\n}\n\n// AI Summary (rich_text)\nif (data.ai_summary) {\n  properties['AI Summary'] = {\n    rich_text: [{ text: { content: data.ai_summary.substring(0, 2000) } }]\n  };\n}\n\n// Domain (rich_text)\nif (data.domain) {\n  properties['Domain'] = {\n    rich_text: [{ text: { content: data.domain } }]\n  };\n}\n\n// Author (rich_text)\nif (data.author) {\n  properties['Author'] = {\n    rich_text: [{ text: { content: data.author.substring(0, 200) } }]\n  };\n}\n\n// Reading Time (number)\nif (data.reading_time) {\n  properties['Reading Time'] = {\n    number: data.reading_time\n  };\n}\n\n// Price (number)\nif (data.price !== undefined && data.price !== null) {\n  properties['Price'] = {\n    number: data.price\n  };\n}\n\n// Status -> To review (since we just processed it)\nproperties['Status'] = {\n  status: { name: 'To review' }\n};\n\nreturn {\n  pageId: data.notionPageId,\n  properties,\n  originalData: data\n};"
+        "jsCode": "// Build Notion API update payload\nconst data = $input.first().json;\n\n// Map type to Notion select options\nconst typeMap = {\n  'video': 'Video',\n  'article': 'Article',\n  'product': 'Product',\n  'tool': 'Tool',\n  'code': 'Code',\n  'social': 'Social',\n  'other': 'Other'\n};\n\nconst properties = {};\n\n// Title\nif (data.title) {\n  properties['Title'] = {\n    title: [{ text: { content: data.title.substring(0, 2000) } }]\n  };\n}\n\n// Type (select)\nif (data.type) {\n  properties['Type'] = {\n    select: { name: typeMap[data.type] || 'Other' }\n  };\n}\n\n// AI Summary (rich_text)\nif (data.ai_summary) {\n  properties['AI Summary'] = {\n    rich_text: [{ text: { content: data.ai_summary.substring(0, 2000) } }]\n  };\n}\n\n// Domain (rich_text)\nif (data.domain) {\n  properties['Domain'] = {\n    rich_text: [{ text: { content: data.domain } }]\n  };\n}\n\n// Author (rich_text)\nif (data.author) {\n  properties['Author'] = {\n    rich_text: [{ text: { content: data.author.substring(0, 200) } }]\n  };\n}\n\n// Reading Time (number)\nif (data.reading_time) {\n  properties['Reading Time'] = {\n    number: data.reading_time\n  };\n}\n\n// Price (number)\nif (data.price !== undefined && data.price !== null) {\n  properties['Price'] = {\n    number: data.price\n  };\n}\n\n// Status -> To review (since we just processed it)\nproperties['Status'] = {\n  status: { name: 'To review' }\n};\n\n// Sync Status -> Not Synced (needs Raindrop sync)\nproperties['Sync Status'] = {\n  select: { name: 'Not Synced' }\n};\n\nreturn {\n  pageId: data.notionPageId,\n  properties,\n  originalData: data\n};"
       },
       "id": "build-notion-payload",
       "name": "Build Notion Payload",
@@ -119,13 +120,121 @@
     },
     {
       "parameters": {
-        "jsCode": "// Return original enriched data for response\nconst payload = $('Build Notion Payload').item.json;\nconst notionResult = $input.first().json;\n\nreturn {\n  ...payload.originalData,\n  notion_updated: true,\n  notion_page_url: notionResult.url || null\n};"
+        "method": "GET",
+        "url": "=https://api.notion.com/v1/blocks/{{ $('Build Notion Payload').item.json.pageId }}/children",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Notion-Version\": \"2022-06-28\"\n}",
+        "options": {}
+      },
+      "id": "get-page-blocks",
+      "name": "Get Page Blocks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, -100],
+      "credentials": {
+        "notionApi": {
+          "id": "vGGxyUaNL70rqYcQ",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Delete existing blocks from page body\nconst blocks = $input.first().json.results || [];\nconst pageId = $('Build Notion Payload').item.json.pageId;\n\n// Return block IDs to delete (we'll use SplitInBatches if needed)\nconst blockIds = blocks.map(b => b.id);\n\nreturn { blockIds, pageId, blockCount: blockIds.length };"
+      },
+      "id": "prepare-delete-blocks",
+      "name": "Prepare Delete Blocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build Notion blocks for page body content\nconst payload = $('Build Notion Payload').item.json;\nconst data = payload.originalData;\nconst blocks = [];\n\n// Helper to create heading + paragraph\nfunction addSection(title, content, emoji = '') {\n  if (!content) return;\n  \n  // Truncate content to 2000 chars per block (Notion limit)\n  const maxLen = 2000;\n  const text = String(content).substring(0, maxLen);\n  \n  blocks.push({\n    object: 'block',\n    type: 'heading_2',\n    heading_2: {\n      rich_text: [{ type: 'text', text: { content: emoji ? `${emoji} ${title}` : title } }]\n    }\n  });\n  \n  blocks.push({\n    object: 'block',\n    type: 'paragraph',\n    paragraph: {\n      rich_text: [{ type: 'text', text: { content: text } }]\n    }\n  });\n}\n\n// Helper for code blocks\nfunction addCodeSection(title, snippets) {\n  if (!snippets || !snippets.length) return;\n  \n  blocks.push({\n    object: 'block',\n    type: 'heading_2',\n    heading_2: {\n      rich_text: [{ type: 'text', text: { content: `💻 ${title}` } }]\n    }\n  });\n  \n  snippets.slice(0, 5).forEach((snippet, i) => {\n    const code = typeof snippet === 'string' ? snippet : snippet.code;\n    const lang = snippet.language || 'plain text';\n    if (code) {\n      blocks.push({\n        object: 'block',\n        type: 'code',\n        code: {\n          rich_text: [{ type: 'text', text: { content: code.substring(0, 2000) } }],\n          language: lang.toLowerCase()\n        }\n      });\n    }\n  });\n}\n\n// Helper for music list\nfunction addMusicSection(music) {\n  if (!music || !music.length) return;\n  \n  blocks.push({\n    object: 'block',\n    type: 'heading_2',\n    heading_2: {\n      rich_text: [{ type: 'text', text: { content: '🎵 Music Recognition' } }]\n    }\n  });\n  \n  music.forEach(track => {\n    const text = typeof track === 'string' ? track : `${track.title} - ${track.artist}`;\n    blocks.push({\n      object: 'block',\n      type: 'bulleted_list_item',\n      bulleted_list_item: {\n        rich_text: [{ type: 'text', text: { content: text } }]\n      }\n    });\n  });\n}\n\n// Add sections based on available content\naddSection('AI Analysis', data.ai_analysis, '🤖');\naddSection('Transcript', data.transcript, '📝');\naddSection('Visual Analysis', data.visual_analysis, '👁️');\naddCodeSection('Code Snippets', data.code_snippets);\naddMusicSection(data.music);\n\nreturn {\n  pageId: payload.pageId,\n  blocks,\n  hasContent: blocks.length > 0,\n  originalData: data\n};"
+      },
+      "id": "build-page-blocks",
+      "name": "Build Page Blocks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, -100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-content",
+              "leftValue": "={{ $json.hasContent }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "has-page-content",
+      "name": "Has Page Content?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2200, -100]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/blocks/{{ $json.pageId }}/children",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Notion-Version\": \"2022-06-28\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ children: $json.blocks }) }}",
+        "options": {}
+      },
+      "id": "append-page-content",
+      "name": "Append Page Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2420, -200],
+      "credentials": {
+        "notionApi": {
+          "id": "vGGxyUaNL70rqYcQ",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// No content to add, just pass through\nconst data = $('Build Page Blocks').item.json;\nreturn {\n  ...data.originalData,\n  page_content_added: false\n};"
+      },
+      "id": "skip-page-content",
+      "name": "Skip Page Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2420, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return original enriched data for response\nconst payload = $('Build Notion Payload').item.json;\nconst pageBlocks = $('Build Page Blocks').item.json;\n\nreturn {\n  ...payload.originalData,\n  notion_updated: true,\n  page_content_added: pageBlocks.hasContent,\n  notion_page_url: `https://notion.so/${payload.pageId.replace(/-/g, '')}`\n};"
       },
       "id": "merge-notion-result",
       "name": "Add Notion Status",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1540, -100]
+      "position": [2640, -100]
     },
     {
       "parameters": {
@@ -147,7 +256,98 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1760, 0]
+      "position": [2860, 0]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/pages/{{ $('Detect URL Type').item.json.notionPageId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Notion-Version\": \"2022-06-28\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"properties\": {\n    \"Status\": { \"status\": { \"name\": \"Error\" } }\n  }\n}",
+        "options": {}
+      },
+      "id": "set-error-status",
+      "name": "Set Error Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 200],
+      "credentials": {
+        "notionApi": {
+          "id": "vGGxyUaNL70rqYcQ",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.notion.com/v1/blocks/{{ $('Detect URL Type').item.json.notionPageId }}/children",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Notion-Version\": \"2022-06-28\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ children: [{ object: 'block', type: 'callout', callout: { rich_text: [{ type: 'text', text: { content: 'Processing failed at ' + new Date().toISOString() + '. Error: ' + ($input.first().json.error?.message || 'Unknown error') } }], icon: { emoji: '❌' }, color: 'red_background' } }] }) }}",
+        "options": {}
+      },
+      "id": "add-error-to-page",
+      "name": "Add Error to Page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 200],
+      "credentials": {
+        "notionApi": {
+          "id": "vGGxyUaNL70rqYcQ",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "notifications@royhen.app.n8n.cloud",
+        "toEmail": "roy@royengel.com",
+        "subject": "=Bookmark Processing Failed: {{ $('Detect URL Type').item.json.url }}",
+        "emailType": "text",
+        "message": "=Bookmark processing failed.\n\nURL: {{ $('Detect URL Type').item.json.url }}\nDomain: {{ $('Detect URL Type').item.json.domain }}\nNotion Page ID: {{ $('Detect URL Type').item.json.notionPageId }}\n\nError: {{ $input.first().json.error?.message || 'Unknown error' }}\n\nTime: {{ new Date().toISOString() }}",
+        "options": {}
+      },
+      "id": "send-error-email",
+      "name": "Send Error Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return error response\nconst detectData = $('Detect URL Type').item.json;\nconst error = $input.first().json.error || { message: 'Unknown error' };\n\nreturn {\n  success: false,\n  url: detectData.url,\n  notionPageId: detectData.notionPageId,\n  error: error.message || error,\n  processed_at: new Date().toISOString()\n};"
+      },
+      "id": "build-error-response",
+      "name": "Build Error Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond with Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 200]
     }
   ],
   "connections": {
@@ -178,6 +378,57 @@
         [
           {
             "node": "Normalize Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Error Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Error Status": {
+      "main": [
+        [
+          {
+            "node": "Add Error to Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Error to Page": {
+      "main": [
+        [
+          {
+            "node": "Send Error Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Error Email": {
+      "main": [
+        [
+          {
+            "node": "Build Error Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Error Response": {
+      "main": [
+        [
+          {
+            "node": "Respond with Error",
             "type": "main",
             "index": 0
           }
@@ -225,6 +476,79 @@
       ]
     },
     "Update Notion Page": {
+      "main": [
+        [
+          {
+            "node": "Get Page Blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Page Blocks": {
+      "main": [
+        [
+          {
+            "node": "Prepare Delete Blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Delete Blocks": {
+      "main": [
+        [
+          {
+            "node": "Build Page Blocks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Page Blocks": {
+      "main": [
+        [
+          {
+            "node": "Has Page Content?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Page Content?": {
+      "main": [
+        [
+          {
+            "node": "Append Page Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip Page Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Page Content": {
+      "main": [
+        [
+          {
+            "node": "Add Notion Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip Page Content": {
       "main": [
         [
           {
