@@ -2,6 +2,7 @@ import functions_framework
 from google.oauth2 import service_account
 from google.cloud import storage
 import google.generativeai as genai
+import assemblyai as aai
 import yt_dlp
 import tempfile
 import subprocess
@@ -15,6 +16,7 @@ from datetime import timedelta
 BUCKET_NAME = os.environ.get('GCS_BUCKET', 'video-processor-temp-rhe')
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')  # Required: set via Cloud Function environment variable
+ASSEMBLYAI_API_KEY = os.environ.get('ASSEMBLYAI_API_KEY')  # Required for transcription
 
 
 def get_storage_client():
@@ -224,6 +226,65 @@ def extract_audio(video_path, tmpdir):
         return None
 
 
+def transcribe_audio(audio_path, api_key=None):
+    """Transcribe audio using AssemblyAI.
+
+    Args:
+        audio_path: Path to the audio file (MP3)
+        api_key: AssemblyAI API key (optional, uses env var if not provided)
+
+    Returns:
+        dict with transcript text, confidence, language, or error
+    """
+    api_key = api_key or ASSEMBLYAI_API_KEY
+    if not api_key:
+        return {'error': 'No AssemblyAI API key provided', 'text': None}
+
+    try:
+        print(f"Starting audio transcription for: {audio_path}")
+
+        # Configure AssemblyAI
+        aai.settings.api_key = api_key
+
+        # Create transcriber with auto language detection
+        config = aai.TranscriptionConfig(
+            language_detection=True,
+            punctuate=True,
+            format_text=True,
+        )
+
+        transcriber = aai.Transcriber(config=config)
+
+        # Transcribe the audio file
+        print("Uploading and transcribing audio...")
+        transcript = transcriber.transcribe(audio_path)
+
+        if transcript.status == aai.TranscriptStatus.error:
+            return {
+                'error': transcript.error,
+                'text': None
+            }
+
+        print(f"Transcription complete. Length: {len(transcript.text or '')} chars")
+
+        return {
+            'text': transcript.text,
+            'confidence': getattr(transcript, 'confidence', None),
+            'language': getattr(transcript, 'language_code', None) or getattr(transcript, 'language', None),
+            'duration_seconds': getattr(transcript, 'audio_duration', None),
+            'word_count': len(transcript.words) if hasattr(transcript, 'words') and transcript.words else 0,
+            'error': None
+        }
+
+    except Exception as e:
+        error_msg = str(e)
+        print(f"Transcription error: {error_msg}")
+        return {
+            'error': error_msg,
+            'text': None
+        }
+
+
 def upload_to_gcs(client, filepath, filename):
     """Upload file to Cloud Storage and return public URL."""
     bucket = client.bucket(BUCKET_NAME)
@@ -380,8 +441,10 @@ def download_and_store(request):
         video_url = request_json.get('video_url')
         custom_filename = request_json.get('filename')
         extract_audio_flag = request_json.get('extract_audio', True)
+        transcribe_audio_flag = request_json.get('transcribe_audio', True)
         analyze_video_flag = request_json.get('analyze_video', True)
         gemini_api_key = request_json.get('gemini_api_key')
+        assemblyai_api_key = request_json.get('assemblyai_api_key')
 
         if not video_url:
             return ({'error': 'video_url is required'}, 400, headers)
@@ -439,6 +502,14 @@ def download_and_store(request):
                         'size_bytes': audio_file['size_bytes'],
                         'blob_name': audio_file['blob_name'],
                     }
+
+                    # Transcribe audio if requested
+                    if transcribe_audio_flag:
+                        transcription_result = transcribe_audio(
+                            audio_path,
+                            api_key=assemblyai_api_key
+                        )
+                        response['transcription'] = transcription_result
 
             # Analyze video with Gemini if requested
             if analyze_video_flag:

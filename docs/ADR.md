@@ -75,6 +75,82 @@ Complete the implementation by adding:
 
 ---
 
+## ADR-002: Notion API Text Length Limit Handling
+
+**Date:** December 28, 2025
+
+**Status:** Implemented
+
+### Context
+
+The Notion API enforces a **2000 character limit** per `rich_text` content block. When processing video transcripts or long-form content, the `Build Page Blocks` node was generating blocks that exceeded this limit, causing API errors:
+
+```
+body.children[7].toggle.children[0].paragraph.rich_text[0].text.content.length
+should be ≤ 2000, instead was 2360
+```
+
+This caused the workflow to fail on videos with longer transcripts (typically 2+ minutes of speech).
+
+### Decision
+
+Added text chunking logic to the `Build Page Blocks` node:
+
+#### 1. New `splitText()` Helper Function
+
+```javascript
+function splitText(text, maxLength = 2000) {
+  if (!text || text.length <= maxLength) return [text];
+
+  const chunks = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLength) {
+      chunks.push(remaining);
+      break;
+    }
+
+    // Find last space before limit (word boundary)
+    let splitAt = remaining.lastIndexOf(' ', maxLength);
+    if (splitAt === -1 || splitAt < maxLength / 2) {
+      splitAt = maxLength; // Force split if no good space
+    }
+
+    chunks.push(remaining.substring(0, splitAt));
+    remaining = remaining.substring(splitAt).trim();
+  }
+
+  return chunks;
+}
+```
+
+#### 2. Updated Block Generation
+
+- `parseContentToBlocks()` now splits long paragraphs into multiple paragraph blocks
+- `parseMarkdown()` truncates individual rich_text elements to max length
+- List items are truncated to prevent overflow
+
+### Consequences
+
+**Positive:**
+
+- Workflow now handles transcripts of any length
+- Text splits at word boundaries for readability
+- No data loss - all content is preserved across multiple blocks
+
+**Trade-offs:**
+
+- Long transcripts appear as multiple paragraphs within toggles (visually acceptable)
+- Slightly more blocks per page for long content
+
+### Related
+
+- ADR-001: Complete Notion Integration
+- Notion API Docs: [Block limits](https://developers.notion.com/reference/request-limits#limits-for-property-values)
+
+---
+
 ## ADR Template
 
 Use this template for future ADRs:
