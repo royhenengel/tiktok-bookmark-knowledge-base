@@ -1,0 +1,104 @@
+# Bookmarks Knowledge Base - Architecture Decision Records (ADR)
+
+This document tracks architectural decisions made during the development of the Bookmark Knowledge Base system.
+
+---
+
+## ADR-001: Complete Notion Integration with Page Body Content and Error Handling
+
+**Date:** December 27, 2025
+
+**Status:** Implemented and deployed (commit 9dd4593)
+
+### Context
+
+The Bookmark_Processor n8n workflow was interrupted during initial implementation, leaving gaps in the Notion integration. The workflow could update page properties but was missing:
+
+1. Page body content (AI Analysis, Transcript, Visual Analysis, Code Snippets, Music Recognition)
+2. Sync Status property mapping
+3. Error handling with notifications
+
+### Decision
+
+Complete the implementation by adding:
+
+#### 1. Page Body Content Flow - 6 new nodes
+
+| Node | Purpose |
+|------|---------|
+| `Get Page Blocks` | Fetch existing blocks from page |
+| `Prepare Delete Blocks` | Prepare block IDs for deletion (clear before replace) |
+| `Build Page Blocks` | Create Notion block objects for rich content |
+| `Has Page Content?` | Conditional check for content |
+| `Append Page Content` | PATCH /blocks/{id}/children API call |
+| `Skip Page Content` | Pass-through when no content |
+
+#### 2. Error Handling Branch - 5 new nodes
+
+| Node | Purpose |
+|------|---------|
+| `Set Error Status` | Sets Notion Status property to "Error" |
+| `Add Error to Page` | Adds red callout block with error details |
+| `Send Error Email` | Emails roy@royengel.com on failures |
+| `Build Error Response` | Formats error JSON |
+| `Respond with Error` | Returns 500 status |
+
+#### 3. Property Mappings
+
+- Added `Sync Status = "Not Synced"` to Build Notion Payload node
+
+### Consequences
+
+**Positive:**
+
+- Workflow now has 21 nodes (up from 10)
+- Full enrichment data now appears in Notion page body with proper formatting:
+  - AI Analysis (heading + paragraph)
+  - Transcript (heading + paragraph)
+  - Visual Analysis (heading + paragraph)
+  - Code Snippets (heading + code blocks)
+  - Music Recognition (heading + bulleted list)
+- Processing failures are now visible in Notion (Status = Error, red callout in page)
+- Email notifications alert on failures
+- Sync Status property enables future Raindrop bidirectional sync
+
+**Trade-offs:**
+
+- Increased workflow complexity (21 vs 10 nodes)
+- Additional API calls per bookmark (get blocks, delete blocks, append blocks)
+
+### Related
+
+- Architecture: `/docs/ARCHITECTURE.md`
+- Schema: `/docs/SCHEMA_DESIGN.md`
+- n8n Workflow: `Bookmark_Processor`
+
+---
+
+## ADR Template
+
+Use this template for future ADRs:
+
+```markdown
+## ADR-XXX: [Title]
+
+**Date:** [Date]
+
+**Status:** [Proposed | Accepted | Deprecated | Superseded]
+
+### Context
+
+[What is the issue that we're seeing that is motivating this decision or change?]
+
+### Decision
+
+[What is the change that we're proposing and/or doing?]
+
+### Consequences
+
+[What becomes easier or more difficult to do because of this change?]
+
+### Related
+
+[Links to related documents, code, or other ADRs]
+```

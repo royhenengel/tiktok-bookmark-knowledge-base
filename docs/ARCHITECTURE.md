@@ -383,6 +383,7 @@ Rate limit: X bookmarks per batch
 | 2024-12-23 | n8n for orchestration only | Keep logic in testable Cloud Functions, n8n for routing/mapping |
 | 2024-12-23 | Notion as source of truth | Richer schema, better UI, relations support |
 | 2024-12-23 | Cloud Functions don't write to Notion/Raindrop | Single responsibility - processing only returns data |
+| 2025-12-27 | Complete Notion integration with page body content | Full enrichment data in page body, error handling with notifications (see ADR-001) |
 
 ---
 
@@ -394,3 +395,4 @@ Rate limit: X bookmarks per batch
 | 2024-12-23 | Defined component boundaries and responsibilities |
 | 2024-12-23 | Added data flow patterns |
 | 2024-12-23 | Added error handling strategy |
+| 2025-12-27 | Added ADR-001: Complete Notion integration with page body content and error handling |
