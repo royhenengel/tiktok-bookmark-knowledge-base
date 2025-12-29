@@ -439,19 +439,28 @@ def enrich_webpage(request):
 Title: {spotify_data['title']}
 Platform: Spotify
 
-Provide:
-1. A brief 2-sentence summary of what this episode is likely about based on the title
-2. Key topics or themes this episode probably covers
-3. Who would find this episode useful
+Provide a brief analysis with:
+1. A 2-sentence summary of what this episode is likely about
+2. Key topics and who would find this useful
 
-Respond in JSON format:
-{{"summary": "2-sentence summary", "analysis": "Key topics and target audience"}}"""
+Respond in this exact JSON format (both values must be plain text strings, not arrays or objects):
+{{"summary": "Your 2-sentence summary here", "analysis": "Key topics: topic1, topic2, topic3. Target audience: description of who would find this useful."}}"""
                         response = model.generate_content(prompt)
                         json_match = re.search(r'\{[\s\S]*\}', response.text.strip())
                         if json_match:
                             parsed = json.loads(json_match.group())
                             ai_result['summary'] = parsed.get('summary')
-                            ai_result['analysis'] = parsed.get('analysis')
+                            # Ensure analysis is a string
+                            analysis = parsed.get('analysis')
+                            if isinstance(analysis, dict):
+                                # Convert object to string if Gemini returns structured data
+                                parts = []
+                                if 'key_topics' in analysis:
+                                    parts.append(f"Key topics: {', '.join(analysis['key_topics']) if isinstance(analysis['key_topics'], list) else analysis['key_topics']}")
+                                if 'target_audience' in analysis:
+                                    parts.append(f"Target audience: {', '.join(analysis['target_audience']) if isinstance(analysis['target_audience'], list) else analysis['target_audience']}")
+                                analysis = '. '.join(parts) if parts else str(analysis)
+                            ai_result['analysis'] = analysis
                     except Exception as e:
                         ai_result['error'] = str(e)
 
