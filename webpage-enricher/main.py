@@ -40,6 +40,25 @@ PRODUCT_PATTERNS = ['amazon.', 'ebay.', 'etsy.com', 'shopify.', 'aliexpress.', '
 PODCAST_PATTERNS = ['spotify.com/episode', 'podcasts.apple.com', 'overcast.fm', 'pocketcasts.com']
 
 
+def fetch_spotify_oembed(url: str) -> dict:
+    """Fetch metadata from Spotify oEmbed API for podcast episodes."""
+    try:
+        oembed_url = f"https://open.spotify.com/oembed?url={url}"
+        response = requests.get(oembed_url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        return {
+            'title': data.get('title'),
+            'thumbnail_url': data.get('thumbnail_url'),
+            'provider_name': data.get('provider_name', 'Spotify'),
+            'type': 'podcast',
+            'success': True
+        }
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+
 def detect_content_type(url: str, soup: BeautifulSoup) -> str:
     """Detect the type of content based on URL and page content."""
     domain = urlparse(url).netloc.lower()
@@ -404,6 +423,62 @@ def enrich_webpage(request):
         # Extract domain
         parsed_url = urlparse(url)
         domain = parsed_url.netloc.replace('www.', '')
+
+        # Special handling for Spotify podcast episodes - use oEmbed API
+        if 'spotify.com/episode' in url.lower():
+            spotify_data = fetch_spotify_oembed(url)
+            if spotify_data.get('success'):
+                # Generate AI analysis from the title (since we can't get full content)
+                ai_result = {'title': spotify_data['title'], 'summary': None, 'analysis': None}
+                if not options.get('skip_ai', False) and GEMINI_API_KEY and spotify_data['title']:
+                    try:
+                        genai.configure(api_key=GEMINI_API_KEY)
+                        model = genai.GenerativeModel('gemini-2.0-flash')
+                        prompt = f"""Analyze this podcast episode based on its title:
+
+Title: {spotify_data['title']}
+Platform: Spotify
+
+Provide:
+1. A brief 2-sentence summary of what this episode is likely about based on the title
+2. Key topics or themes this episode probably covers
+3. Who would find this episode useful
+
+Respond in JSON format:
+{{"summary": "2-sentence summary", "analysis": "Key topics and target audience"}}"""
+                        response = model.generate_content(prompt)
+                        json_match = re.search(r'\{[\s\S]*\}', response.text.strip())
+                        if json_match:
+                            parsed = json.loads(json_match.group())
+                            ai_result['summary'] = parsed.get('summary')
+                            ai_result['analysis'] = parsed.get('analysis')
+                    except Exception as e:
+                        ai_result['error'] = str(e)
+
+                response_data = {
+                    'url': url,
+                    'domain': domain,
+                    'type': 'podcast',
+                    'title': spotify_data['title'],
+                    'author': spotify_data['provider_name'],
+                    'published_date': None,
+                    'main_image': spotify_data['thumbnail_url'],
+                    'description': None,
+                    'reading_time': None,
+                    'price': None,
+                    'currency': None,
+                    'code_snippets': [],
+                    'ai_summary': ai_result.get('summary'),
+                    'ai_analysis': ai_result.get('analysis'),
+                    'processed_at': datetime.utcnow().isoformat() + 'Z',
+                }
+                if ai_result.get('error'):
+                    response_data['error'] = {
+                        'stage': 'ai_analysis',
+                        'message': ai_result['error'],
+                        'recoverable': True
+                    }
+                return (json.dumps(response_data), 200, headers)
 
         # Fetch the webpage
         html, fetch_error = fetch_webpage(url)
