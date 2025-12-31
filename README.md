@@ -194,8 +194,11 @@ pytest tests/unit/test_error_contracts.py::TestTitleLengthLimits -v  # Title tes
 
 | Document | Description |
 |----------|-------------|
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, boundaries, data flows |
-| [SCHEMA_DESIGN.md](docs/SCHEMA_DESIGN.md) | Notion schema design and decisions |
+| [Bookmark-Knowledge-Base-Product-Spec.md](docs/Bookmark-Knowledge-Base-Product-Spec.md) | High-level goals, requirements, scope |
+| [Bookmark-Knowledge-Base-Implementation-Spec.md](docs/Bookmark-Knowledge-Base-Implementation-Spec.md) | System architecture, components, data flow |
+| [Video-Processor-Product-Spec.md](docs/Video-Processor-Product-Spec.md) | Video processor requirements |
+| [Video-Processor-Implementation-Spec.md](docs/Video-Processor-Implementation-Spec.md) | Video processor technical details |
+| [Bookmarks-Knowledge-Base-ADR.md](docs/Bookmarks-Knowledge-Base-ADR.md) | Architecture Decision Records |
 | [shared/README.md](shared/README.md) | Shared utilities and section icons |
 
 ## Cost Estimate
