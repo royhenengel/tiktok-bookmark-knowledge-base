@@ -42,6 +42,9 @@ def is_error(response: dict, status_code: int = 200) -> bool:
             # Transcription errors for podcasts are notable
             if error.get('stage') == 'transcription':
                 return True
+            # AI analysis failures should be notified
+            if error.get('stage') == 'ai_analysis':
+                return True
             # Non-recoverable errors are critical
             if error.get('recoverable') is False:
                 return True
@@ -54,6 +57,24 @@ def is_error(response: dict, status_code: int = 200) -> bool:
     valid_types = ['article', 'video', 'podcast', 'product', 'code', 'social', 'document']
     if response.get('type') not in valid_types:
         return True
+
+    content_type = response.get('type')
+
+    # Video/podcast without transcript is notable
+    if content_type in ['video', 'podcast']:
+        if not response.get('transcription') and not response.get('transcript'):
+            return True
+
+    # Product without price is notable
+    if content_type == 'product':
+        if not response.get('price'):
+            return True
+
+    # Code page without code snippets is notable
+    if content_type == 'code':
+        snippets = response.get('code_snippets', [])
+        if not snippets or len(snippets) == 0:
+            return True
 
     return False
 
@@ -115,8 +136,8 @@ class TestIsError:
         }
         assert is_error(response) is True
 
-    def test_errors_with_only_ai_failure_may_not_trigger(self):
-        """AI-only failure in errors array may not trigger notification."""
+    def test_errors_with_ai_failure_triggers_notification(self):
+        """AI failure in errors array should trigger notification."""
         response = {
             'url': 'https://example.com/article',
             'type': 'article',
@@ -125,9 +146,8 @@ class TestIsError:
                 {'stage': 'ai_analysis', 'message': 'Gemini error', 'recoverable': True}
             ]
         }
-        # AI failure alone with good title and type is borderline
-        # Current implementation: only check transcription and non-recoverable
-        assert is_error(response) is False  # May want to change this
+        # AI analysis is important - notify even if recoverable
+        assert is_error(response) is True
 
     # =========================================================================
     # Missing Required Fields
@@ -189,7 +209,19 @@ class TestIsError:
         assert is_error(response) is False
 
     def test_complete_video_is_not_error(self):
-        """Complete video response is not an error."""
+        """Complete video response with transcript is not an error."""
+        response = {
+            'url': 'https://tiktok.com/@user/video/123',
+            'type': 'video',
+            'title': 'Cool Video',
+            'author': 'Creator',
+            'transcription': 'Video transcript here...',
+            'processed_at': '2024-12-31T00:00:00Z'
+        }
+        assert is_error(response) is False
+
+    def test_video_without_transcript_is_error(self):
+        """Video without transcript triggers notification."""
         response = {
             'url': 'https://tiktok.com/@user/video/123',
             'type': 'video',
@@ -197,7 +229,7 @@ class TestIsError:
             'author': 'Creator',
             'processed_at': '2024-12-31T00:00:00Z'
         }
-        assert is_error(response) is False
+        assert is_error(response) is True
 
     def test_complete_podcast_is_not_error(self):
         """Complete podcast response is not an error."""
@@ -271,15 +303,36 @@ class TestEdgeCases:
         }
         assert is_error(response) is False
 
-    def test_empty_code_snippets_ok(self):
-        """Empty code snippets for code type is acceptable."""
+    def test_empty_code_snippets_is_error(self):
+        """Empty code snippets for code type triggers notification."""
         response = {
             'url': 'https://stackoverflow.com/q/123',
             'type': 'code',
             'title': 'How to do X?',
             'code_snippets': [],
         }
-        assert is_error(response) is False
+        assert is_error(response) is True
+
+    def test_product_without_price_is_error(self):
+        """Product without price triggers notification."""
+        response = {
+            'url': 'https://amazon.com/dp/B00123',
+            'type': 'product',
+            'title': 'Widget Pro',
+            'processed_at': '2024-12-31T00:00:00Z'
+        }
+        assert is_error(response) is True
+
+    def test_podcast_without_transcript_is_error(self):
+        """Podcast without transcript triggers notification."""
+        response = {
+            'url': 'https://open.spotify.com/episode/abc',
+            'type': 'podcast',
+            'title': 'Episode Title',
+            'show_name': 'My Podcast',
+            'processed_at': '2024-12-31T00:00:00Z'
+        }
+        assert is_error(response) is True
 
     def test_zero_reading_time_ok(self):
         """Zero reading time is acceptable."""

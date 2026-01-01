@@ -373,11 +373,13 @@
     {
       "parameters": {
         "fromEmail": "notifications@royhen.app.n8n.cloud",
-        "toEmail": "roy@royengel.com",
+        "toEmail": "royhenengel@gmail.com",
         "subject": "=Bookmark Processing Failed: {{ $('Detect URL Type').item.json.url }}",
         "emailType": "text",
         "message": "=Bookmark processing failed.\n\nURL: {{ $('Detect URL Type').item.json.url }}\nDomain: {{ $('Detect URL Type').item.json.domain }}\nNotion Page ID: {{ $('Detect URL Type').item.json.notionPageId }}\n\nError: {{ $input.first().json.error?.message || 'Unknown error' }}\n\nTime: {{ new Date().toISOString() }}",
-        "options": {}
+        "options": {
+          "senderName": "LifeOS"
+        }
       },
       "id": "send-error-email",
       "name": "Send Error Email",
@@ -1094,11 +1096,13 @@
       {
         "parameters": {
           "fromEmail": "notifications@royhen.app.n8n.cloud",
-          "toEmail": "roy@royengel.com",
+          "toEmail": "royhenengel@gmail.com",
           "subject": "=Bookmark Processing Failed: {{ $('Detect URL Type').item.json.url }}",
           "emailType": "text",
           "message": "=Bookmark processing failed.\n\nURL: {{ $('Detect URL Type').item.json.url }}\nDomain: {{ $('Detect URL Type').item.json.domain }}\nNotion Page ID: {{ $('Detect URL Type').item.json.notionPageId }}\n\nError: {{ $input.first().json.error?.message || 'Unknown error' }}\n\nTime: {{ new Date().toISOString() }}",
-          "options": {}
+          "options": {
+            "senderName": "LifeOS"
+          }
         },
         "id": "send-error-email",
         "name": "Send Error Email",
