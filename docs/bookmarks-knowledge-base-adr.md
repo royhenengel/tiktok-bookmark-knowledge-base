@@ -26,11 +26,7 @@ Complete the implementation by adding:
 
 ### 1. Page Body Content Flow – 6 new nodes
 
-<!-- Table not supported -->
-
 ### 2. Error Handling Branch – 6 new nodes
-
-<!-- Table not supported -->
 
 ### 3. Property Mappings
 
@@ -182,19 +178,13 @@ The error notification system needed refinement:
 
 ### 1. Email Configuration Updates
 
-<!-- Table not supported -->
-
 ### 2. Enhanced Notification Triggers
 
 Updated `is_error()` function in `tests/unit/test_notification_logic.py`:
 
-<!-- Table not supported -->
-
 ### 3. Error Classification
 
 Errors are classified into tiers:
-
-<!-- Table not supported -->
 
 ### Consequences
 
